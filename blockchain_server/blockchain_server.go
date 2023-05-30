@@ -30,28 +30,29 @@ func (bcs *BlockchainServer) GetBlockchain() *block.Blockchain {
 	if !ok {
 		minersWallet := wallet.NewWallet()
 		bc = block.NewBlockchain(minersWallet.BlockchainAddress(), minersWallet.PublicKeyStr(),
-			minersWallet.PrivateKeyStr(), bcs.Port())
+			minersWallet.PrivateKeyStr(), bcs.Port(), 100.00)
 		cache["blockchain"] = bc
-		log.Printf("private_key %v", minersWallet.PrivateKeyStr())
-		log.Printf("publick_key %v", minersWallet.PublicKeyStr())
-		log.Printf("blockchain_address %v", minersWallet.BlockchainAddress())
+		log.Printf("private_key %v", bc.PrivateKey())
+		log.Printf("publick_key %v", bc.PublicKey())
+		log.Printf("blockchain_address %v", bc.Address())
+		log.Printf("我的余额为： %f", bc.Balance())
 	}
 	return bc
 }
 
-func (bcs *BlockchainServer) NewBlockchain() *block.Blockchain {
-	bc, ok := cache["blockchain"]
-	if !ok {
-		minersWallet := wallet.NewWallet()
-		bc = block.NewBlockchain(minersWallet.BlockchainAddress(), minersWallet.PublicKeyStr(),
-			minersWallet.PrivateKeyStr(), bcs.Port())
-		cache["blockchain"] = bc
-		log.Printf("private_key %v", minersWallet.PrivateKeyStr())
-		log.Printf("publick_key %v", minersWallet.PublicKeyStr())
-		log.Printf("blockchain_address %v", minersWallet.BlockchainAddress())
-	}
-	return bc
-}
+// func (bcs *BlockchainServer) NewBlockchain() *block.Blockchain {
+// 	bc, ok := cache["blockchain"]
+// 	if !ok {
+// 		minersWallet := wallet.NewWallet()
+// 		bc = block.NewBlockchain(minersWallet.BlockchainAddress(), minersWallet.PublicKeyStr(),
+// 			minersWallet.PrivateKeyStr(), bcs.Port(),100.00)
+// 		cache["blockchain"] = bc
+// 		log.Printf("private_key %v", minersWallet.PrivateKeyStr())
+// 		log.Printf("publick_key %v", minersWallet.PublicKeyStr())
+// 		log.Printf("blockchain_address %v", minersWallet.BlockchainAddress())
+// 	}
+// 	return bc
+// }
 
 func (bcs *BlockchainServer) GetChain(w http.ResponseWriter, req *http.Request) {
 	switch req.Method {
@@ -129,7 +130,7 @@ func (bcs *BlockchainServer) Transactions(w http.ResponseWriter, req *http.Reque
 		signature := utils.SignatureFromString(*t.Signature)
 		bc := bcs.GetBlockchain()
 		// 需要转发使用CreateTransaction
-		isUpdated := bc.CreateTransaction(*t.SenderBlockchainAddress,
+		isUpdated := bc.AddTransaction(*t.SenderBlockchainAddress,
 			*t.RecipientBlockchainAddress, *t.Value, publicKey, signature)
 
 		w.Header().Add("Content-Type", "application/json")
@@ -190,8 +191,7 @@ func (bcs *BlockchainServer) StartMine(w http.ResponseWriter, req *http.Request)
 func (bcs *BlockchainServer) Amount(w http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodGet:
-		blockchainAddress := req.URL.Query().Get("blockchain_address")
-		amount := bcs.GetBlockchain().CalculateTotalAmount(blockchainAddress)
+		amount := bcs.GetBlockchain().Balance()
 
 		ar := &block.AmountResponse{Amount: amount}
 		m, _ := ar.MarshalJSON()
@@ -240,6 +240,7 @@ func (bcs *BlockchainServer) Consensus(w http.ResponseWriter, req *http.Request)
 }
 
 func (bcs *BlockchainServer) Run() {
+	
 	bcs.GetBlockchain().Run()
 
 	http.HandleFunc("/", bcs.GetChain)
